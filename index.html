@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoYaL PuTo | Coding With Ai</title>
+    <style>
+        :root { 
+            --bg: radial-gradient(circle at top right, #1a202c, #0f172a, #020617);
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
+            --accent: #38bdf8;
+            --blur: blur(15px);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background: var(--bg); color: #e2e8f0; height: 100vh; display: flex; overflow: hidden; }
+
+        /* Sidebar Glass */
+        aside { 
+            width: 280px; background: rgba(15, 23, 42, 0.6); backdrop-filter: var(--blur);
+            border-right: 1px solid var(--border); padding: 30px; display: flex; flex-direction: column; gap: 20px;
+        }
+
+        .logo { font-size: 20px; font-weight: 800; color: var(--accent); letter-spacing: 1px; }
+
+        /* Main Chat Area */
+        main { flex: 1; display: flex; flex-direction: column; position: relative; }
+        #chat-window { flex: 1; overflow-y: auto; padding: 40px; display: flex; flex-direction: column; gap: 20px; }
+        
+        /* Message Bubbles */
+        .msg { 
+            max-width: 80%; padding: 15px 20px; border-radius: 18px; font-size: 14.5px;
+            backdrop-filter: var(--blur); border: 1px solid var(--border);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .user { align-self: flex-end; background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.3); }
+        .ai { align-self: flex-start; background: var(--glass); }
+
+        .img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-top: 10px; }
+        .msg img { width: 100%; border-radius: 10px; border: 1px solid var(--border); }
+
+        /* Input Controls */
+        .input-area { padding: 30px 60px; }
+        .glass-box { 
+            max-width: 900px; margin: 0 auto; background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: var(--blur); border: 1px solid var(--border);
+            border-radius: 20px; padding: 12px 20px; display: flex; align-items: center;
+        }
+        
+        #preview-container { display: flex; gap: 10px; margin-bottom: 12px; padding: 0 60px; }
+        .preview-card { width: 60px; height: 60px; border-radius: 10px; border: 2px solid var(--accent); overflow: hidden; position: relative; }
+        .preview-card img { width: 100%; height: 100%; object-fit: cover; }
+        .rem-btn { position: absolute; top: 0; right: 0; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; padding: 2px 5px; }
+
+        input[type="text"] { flex: 1; background: transparent; border: none; color: white; outline: none; font-size: 16px; margin-left: 15px; }
+        #send-btn { background: var(--accent); border: none; color: #0f172a; padding: 10px 25px; border-radius: 12px; font-weight: 700; cursor: pointer; }
+
+        .loader { display: flex; gap: 4px; padding: 5px; }
+        .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; animation: blink 1.4s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<aside>
+    <div class="logo">RoYaL PuTo | Coding With Ai</div>
+    <div style="margin-top: 20px;">
+        <label style="font-size: 11px; color: #94a3b8;">SELECT ENGINE</label>
+        <select id="model-select" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.4); color: white; border: 1px solid var(--border); border-radius: 10px; margin-top: 8px;">
+            <option value="gemini-2.5-flash">Gemini</option>
+            <option value="google/gemma-4-26b-a4b-it:free">Gemma 4 (New)</option>
+        </select>
+        <button onclick="clearHistory()" style="width: 100%; margin-top: 15px; padding: 10px; background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; cursor: pointer; font-size: 12px;">Clear Memory</button>
+    </div>
+</aside>
+
+<main>
+    <div id="chat-window">
+        <div class="msg ai">සාදරයෙන් පිළිගන්නවා! මට දැන් පරණ දේවල් මතක තියාගන්න පුළුවන්. ඕන දෙයක් අහන්න.</div>
+    </div>
+
+    <div id="preview-container"></div>
+
+    <div class="input-area">
+        <div class="glass-box">
+            <span style="font-size: 24px; cursor: pointer; color: #94a3b8;" onclick="document.getElementById('file-input').click()">+</span>
+            <input type="file" id="file-input" style="display: none;" accept="image/*" multiple onchange="handleFiles(event)">
+            <input type="text" id="user-input" placeholder="Type your message..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <button id="send-btn" onclick="sendMessage()">SEND</button>
+        </div>
+    </div>
+</main>
+
+<script>
+    // API Config
+    const CONFIG = {
+        GEMINI_KEY: "AQ.Ab8RN6Kn4HqpmiFseT7sHsR9o2SnkcpZbwk3Oy5sXNNFNjgVNQ",
+        OPENROUTER_KEY: "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"
+    };
+
+    let chatHistory = []; // සේරම මැසේජ් ටික මෙතන තියාගන්නවා
+    let currentFiles = [];
+
+    function handleFiles(e) {
+        Array.from(e.target.files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                currentFiles.push({ base64: ev.target.result.split(',')[1], mime: file.type, url: ev.target.result });
+                renderPreviews();
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function renderPreviews() {
+        const con = document.getElementById('preview-container');
+        con.innerHTML = currentFiles.map((f, i) => `<div class="preview-card"><img src="${f.url}"><button class="rem-btn" onclick="removeImg(${i})">×</button></div>`).join('');
+    }
+
+    function removeImg(i) { currentFiles.splice(i, 1); renderPreviews(); }
+
+    function clearHistory() {
+        chatHistory = [];
+        document.getElementById('chat-window').innerHTML = '<div class="msg ai">Memory cleared! අලුත් සංවාදයක් ආරම්භ කරමු.</div>';
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('user-input');
+        const text = input.value.trim();
+        const model = document.getElementById('model-select').value;
+        if (!text && currentFiles.length === 0) return;
+
+        //
+        const displayPrompt = text || "Describe these images.";
+        
+        // UI එකට ඇඩ් කරනවා
+        addMessage(displayPrompt, 'user', currentFiles);
+        
+        // History එකට ඇඩ් කරනවා
+        const userTurn = { role: "user", parts: [{ text: displayPrompt }] };
+        currentFiles.forEach(f => userTurn.parts.push({ inline_data: { mime_type: f.mime, data: f.base64 } }));
+        chatHistory.push(userTurn);
+
+        const activeFiles = [...currentFiles];
+        currentFiles = []; renderPreviews(); input.value = '';
+
+        const aiMsgId = 'ai-' + Date.now();
+        showLoading(aiMsgId);
+
+        try {
+            let responseText = "";
+            if (model.includes("gemini")) {
+                // Gemini Memory Request
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${CONFIG.GEMINI_KEY}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ contents: chatHistory })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error?.message || "API Error");
+                responseText = data.candidates[0].content.parts[0].text;
+            } else {
+                // OpenRouter Memory Request
+                const orMessages = chatHistory.map(m => ({
+                    role: m.role === "model" ? "assistant" : "user",
+                    content: m.parts[0].text
+                }));
+                const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${CONFIG.OPENROUTER_KEY}` },
+                    body: JSON.stringify({ model: model, messages: orMessages })
+                });
+                const data = await res.json();
+                responseText = data.choices[0].message.content;
+            }
+
+            // AI පිළිතුර History එකට එකතු කරනවා
+            chatHistory.push({ role: "model", parts: [{ text: responseText }] });
+            document.getElementById(aiMsgId).innerText = responseText;
+
+        } catch (e) {
+            document.getElementById(aiMsgId).innerText = "Error: " + e.message;
+            document.getElementById(aiMsgId).style.color = "#fca5a5";
+        }
+    }
+
+    function addMessage(text, type, imgs = []) {
+        const div = document.createElement('div');
+        div.className = `msg ${type}`;
+        div.innerHTML = `<div>${text}</div>`;
+        if (imgs.length > 0) {
+            const grid = document.createElement('div');
+            grid.className = 'img-grid';
+            imgs.forEach(m => { const i = document.createElement('img'); i.src = m.url; grid.appendChild(i); });
+            div.appendChild(grid);
+        }
+        document.getElementById('chat-window').appendChild(div);
+        document.getElementById('chat-window').scrollTop = document.getElementById('chat-window').scrollHeight;
+    }
+
+    function showLoading(id) {
+        const div = document.createElement('div'); div.className = 'msg ai'; div.id = id;
+        div.innerHTML = `<div class="loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+        document.getElementById('chat-window').appendChild(div);
+        document.getElementById('chat-window').scrollTop = document.getElementById('chat-window').scrollHeight;
+    }
+</script>
+</body>
+</html>
